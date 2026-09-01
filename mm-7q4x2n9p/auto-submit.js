@@ -1,0 +1,1 @@
+(()=>{const field=document.getElementById('pinEntry'),action=document.getElementById('unlockBtn');if(field&&action)field.addEventListener('input',()=>{if(field.value.length===field.maxLength)action.click()})})();
