@@ -1,0 +1,17 @@
+{
+  "name": "Money Mile",
+  "short_name": "Money Mile",
+  "start_url": "/forced-self-care/mm-7q4x2n9p/",
+  "scope": "/forced-self-care/mm-7q4x2n9p/",
+  "display": "standalone",
+  "background_color": "#f5f6f8",
+  "theme_color": "#111827",
+  "icons": [
+    {
+      "src": "icon-180.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
