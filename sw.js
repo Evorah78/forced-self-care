@@ -1,7 +1,12 @@
-const CACHE='forced-self-care-v14';
+const CACHE='forced-self-care-v15';
 const ASSETS=['./','index.html','manifest.webmanifest','icon.png'];
+self.addEventListener('message',event=>{if(event.data?.type==='SET_ROLE')event.waitUntil(setMeta('role',event.data.role));if(event.data?.type==='CLEAR_BADGE')event.waitUntil(Promise.all([setMeta('badgeCount',0),'clearAppBadge' in self.navigator?self.navigator.clearAppBadge():Promise.resolve()]))});
+const badgeDb=()=>new Promise((resolve,reject)=>{const request=indexedDB.open('forced-self-care-badges',1);request.onupgradeneeded=()=>request.result.createObjectStore('meta');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)});
+const getMeta=async key=>{const db=await badgeDb();return new Promise((resolve,reject)=>{const request=db.transaction('meta').objectStore('meta').get(key);request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)})};
+const setMeta=async(key,value)=>{const db=await badgeDb();return new Promise((resolve,reject)=>{const request=db.transaction('meta','readwrite').objectStore('meta').put(value,key);request.onsuccess=()=>resolve();request.onerror=()=>reject(request.error)})};
+async function addMonitorBadge(){try{if(await getMeta('role')!=='monitor'||!('setAppBadge' in self.navigator))return;const count=Number(await getMeta('badgeCount')||0)+1;await setMeta('badgeCount',count);await self.navigator.setAppBadge(count)}catch{}}
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS))));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key))))));
 self.addEventListener('fetch',event=>{if(event.request.method==='GET')event.respondWith(fetch(event.request).catch(()=>caches.match(event.request)))});
-self.addEventListener('push',event=>{let data={title:'Forced Self Care',body:'Medication reminder',tag:'reminder',url:'./'};try{data={...data,...event.data.json()}}catch{}event.waitUntil(self.registration.showNotification(data.title,{body:data.body,icon:'icon.png',badge:'icon.png',tag:data.tag,data:{url:data.url},vibrate:[300,150,300],requireInteraction:true}))});
+self.addEventListener('push',event=>{let data={title:'Forced Self Care',body:'Medication reminder',tag:'reminder',url:'./'};try{data={...data,...event.data.json()}}catch{}event.waitUntil(Promise.all([self.registration.showNotification(data.title,{body:data.body,icon:'icon.png',badge:'icon.png',tag:data.tag,data:{url:data.url},vibrate:[300,150,300],requireInteraction:true}),addMonitorBadge()]))});
 self.addEventListener('notificationclick',event=>{event.notification.close();event.waitUntil(clients.matchAll({type:'window',includeUncontrolled:true}).then(list=>{for(const client of list){if('focus' in client)return client.focus()}return clients.openWindow(event.notification.data?.url||'./')}))});
