@@ -1,4 +1,4 @@
-const CACHE='forced-self-care-v20';
+const CACHE='forced-self-care-v21';
 const ASSETS=['./','index.html','manifest.webmanifest','icon.png'];
 self.addEventListener('message',event=>{if(event.data?.type==='SET_ROLE')event.waitUntil(setMeta('role',event.data.role));if(event.data?.type==='CLEAR_BADGE')event.waitUntil(Promise.all([setMeta('badgeCount',0),'clearAppBadge' in self.navigator?self.navigator.clearAppBadge():Promise.resolve()]))});
 const badgeDb=()=>new Promise((resolve,reject)=>{const request=indexedDB.open('forced-self-care-badges',1);request.onupgradeneeded=()=>request.result.createObjectStore('meta');request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error)});
