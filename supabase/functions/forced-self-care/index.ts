@@ -162,7 +162,7 @@ Deno.serve(async (request) => {
       const hour = Number(parts.find((p) => p.type === 'hour')?.value || -1)
       const minute = Number(parts.find((p) => p.type === 'minute')?.value || -1)
       const date = londonDate()
-      const morningReminder = hour === 8 && [0, 30, 45].includes(minute)
+      const morningReminder = (minute === 30 && hour >= 8 && hour <= 14) || (hour === 15 && minute === 0)
       const magnesiumReminder = (hour === 22 && [0, 30].includes(minute)) || (hour === 23 && minute === 0)
       if (morningReminder || magnesiumReminder) {
         let medicationQuery = admin.from('fsc_medications').select('id,name').eq('active', true)
@@ -170,14 +170,16 @@ Deno.serve(async (request) => {
         const { data: dueMedications, error: medicationError } = await medicationQuery.order('sort_order')
         if (medicationError) throw medicationError
         const medicationIds = (dueMedications || []).map((medication) => medication.id)
-        let takenIds = new Set<number>()
+        let completedIds = new Set<number>()
         if (medicationIds.length) {
-          const { data: takenRows, error: takenError } = await admin.from('fsc_daily_records')
-            .select('medication_id').eq('record_date', date).eq('status', 'taken').in('medication_id', medicationIds)
-          if (takenError) throw takenError
-          takenIds = new Set((takenRows || []).map((row) => Number(row.medication_id)))
+          const { data: completedRows, error: completedError } = await admin.from('fsc_daily_records')
+            .select('medication_id,status,reason').eq('record_date', date).in('medication_id', medicationIds)
+          if (completedError) throw completedError
+          completedIds = new Set((completedRows || [])
+            .filter((row) => row.status === 'taken' || ((row.status === 'run_out' || row.status === 'not_taken') && String(row.reason || '').trim()))
+            .map((row) => Number(row.medication_id)))
         }
-        const incomplete = (dueMedications || []).filter((medication) => !takenIds.has(Number(medication.id)))
+        const incomplete = (dueMedications || []).filter((medication) => !completedIds.has(Number(medication.id)))
         if (incomplete.length) {
           const slot = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
           await pushRoles(['taker'], {
