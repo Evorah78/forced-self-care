@@ -326,6 +326,13 @@ Deno.serve(async (request) => {
       const { data: med } = await admin.from('fsc_medications').select('name').eq('id', medicationId).single()
       if (!med) return json({ error: 'Medication not found' }, 404)
       const date = londonDate()
+      const { data: existingRecord, error: existingError } = await admin.from('fsc_daily_records')
+        .select('status,reason').eq('record_date', date).eq('medication_id', medicationId).maybeSingle()
+      if (existingError) throw existingError
+      const desiredReason = status === 'taken' ? '' : reason
+      if (existingRecord?.status === status && String(existingRecord.reason || '').trim() === desiredReason) {
+        return json({ ok: true, duplicate: true })
+      }
       const { error } = await admin.from('fsc_daily_records').upsert({ record_date: date, medication_id: medicationId, status, reason: status === 'taken' ? null : reason, updated_by: auth.role, updated_at: new Date().toISOString() })
       if (error) throw error
       const message = status === 'taken' ? `${med.name} marked as taken` : `${med.name} marked ${status === 'run_out' ? 'as run out' : 'not taken'}: ${reason}`
