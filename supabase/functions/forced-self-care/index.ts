@@ -248,6 +248,10 @@ Deno.serve(async (request) => {
         return json({ error: blocked ? 'Too many incorrect attempts. Try again in 15 minutes.' : 'Incorrect PIN' }, 401)
       }
       await admin.from('fsc_login_attempts').upsert(['monitor', 'taker'].map((attemptRole) => ({ role: attemptRole, failed_count: 0, blocked_until: null, updated_at: new Date().toISOString() })))
+      // There is one designated iPhone for each role. Revoke older sessions so
+      // auto-lock/re-entry cannot leave an ever-growing set of valid tokens.
+      const { error: sessionCleanupError } = await admin.from('fsc_sessions').delete().eq('role', role)
+      if (sessionCleanupError) throw sessionCleanupError
       await admin.from('fsc_events').insert({ event_type: 'login', role, message: `${role === 'monitor' ? 'Monitor' : 'Medication taker'} signed in` })
       return json({ token: await issueSession(role) })
     }
@@ -261,6 +265,10 @@ Deno.serve(async (request) => {
       const p256dh = String(subscription.keys?.p256dh || '')
       const authKey = String(subscription.keys?.auth || '')
       if (!endpoint.startsWith('https://') || !p256dh || !authKey) return json({ error: 'The notification subscription is not valid' }, 400)
+      // Keep one current push endpoint per role so a reinstalled Home Screen
+      // app cannot cause the same reminder to be delivered several times.
+      const { error: pushCleanupError } = await admin.from('fsc_push_subscriptions').delete().eq('role', auth.role).neq('endpoint', endpoint)
+      if (pushCleanupError) throw pushCleanupError
       const { error } = await admin.from('fsc_push_subscriptions').upsert({
         role: auth.role, endpoint, p256dh, auth: authKey, updated_at: new Date().toISOString(),
       }, { onConflict: 'endpoint' })
